@@ -1,0 +1,117 @@
+cluster:
+  name: k8s-homelab
+
+destinations:
+  grafana-cloud-metrics:
+    type: prometheus
+    url: https://prometheus-prod-40-prod-sa-east-1.grafana.net./api/prom/push
+    auth:
+      type: basic
+      username: "3399288"
+      password: ${GRAFANA_CLOUD_TOKEN}
+  grafana-cloud-logs:
+    type: loki
+    url: https://logs-prod-024.grafana.net./loki/api/v1/push
+    auth:
+      type: basic
+      username: "1695319"
+      password: ${GRAFANA_CLOUD_TOKEN}
+  gc-otlp-endpoint:
+    type: otlp
+    url: https://otlp-gateway-prod-sa-east-1.grafana.net./otlp
+    protocol: http
+    auth:
+      type: basic
+      username: "1737532"
+      password: ${GRAFANA_CLOUD_TOKEN}
+    metrics:
+      enabled: true
+    logs:
+      enabled: true
+    traces:
+      enabled: true
+
+clusterMetrics:
+  enabled: true
+  collector: alloy-metrics
+
+hostMetrics:
+  enabled: true
+  collector: alloy-metrics
+  linuxHosts:
+    enabled: true
+  windowsHosts:
+    enabled: false # sem node Windows no cluster
+
+clusterEvents:
+  enabled: true
+  collector: alloy-singleton
+
+podLogsViaLoki:
+  enabled: true
+  collector: alloy-logs
+
+applicationObservability:
+  enabled: true
+  collector: alloy-receiver
+  receivers:
+    otlp:
+      grpc:
+        enabled: true
+        port: 4317
+      http:
+        enabled: true
+        port: 4318
+    zipkin:
+      enabled: true
+      port: 9411
+
+autoInstrumentation:
+  enabled: true
+  collector: alloy-metrics
+  beyla:
+    deliverTracesToApplicationObservability: false
+
+profiling:
+  enabled: false
+
+costMetrics:
+  enabled: false
+
+collectors:
+  alloy-metrics:
+    presets:
+      - clustered
+      - statefulset
+  alloy-singleton:
+    presets:
+      - singleton
+  alloy-logs:
+    presets:
+      - filesystem-log-reader
+      - daemonset
+  alloy-receiver:
+    presets:
+      - deployment
+
+collectorCommon:
+  alloy:
+    remoteConfig:
+      enabled: true
+      url: https://fleet-management-prod-015.grafana.net
+      auth:
+        type: basic
+        username: "1737532"
+        password: ${GRAFANA_CLOUD_TOKEN}
+
+telemetryServices:
+  kube-state-metrics:
+    deploy: true
+  node-exporter:
+    deploy: true
+  windows-exporter:
+    deploy: false
+  opencost:
+    deploy: false
+  kepler:
+    deploy: false

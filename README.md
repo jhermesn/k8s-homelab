@@ -28,7 +28,7 @@ AWS Spot worker (0-2, sob demanda) → Tailscale mesh → kube-apiserver
 .env.example        # copiar para .env (gitignored) no master node
 cd.sh                # CD: git pull + helm/manifests + terraform apply
 os-setup/setup.sh   # provisionamento OS-level (idempotente)
-helm-releases/       # Cilium, cert-manager, Trivy Operator (install.sh idempotente)
+helm-releases/       # Cilium, cert-manager, Trivy Operator, Grafana Alloy (install.sh idempotente)
 manifests/           # ClusterIssuer, Gateway, cloudflared, cluster-autoscaler (apply.sh)
 terraform/           # worker Spot AWS
 examples/app-template/  # referência pra deployar apps novas (não aplicado por apply.sh)
@@ -42,8 +42,10 @@ examples/app-template/  # referência pra deployar apps novas (não aplicado por
    Helm, cloudflared. Ver pendências manuais impressas ao final.
 3. `kubeadm init` (dual-stack).
 4. `cp .env.example .env` e preencher `TUNNEL_ID`, `ACME_EMAIL`,
-   `CONTROL_PLANE_LAN_IP`, `AWS_REGION` (requer `envsubst`, pacote `gettext-base`).
-5. `bash helm-releases/install.sh` - Gateway API CRDs, Cilium, cert-manager.
+   `CONTROL_PLANE_LAN_IP`, `AWS_REGION`, `GRAFANA_CLOUD_TOKEN` (requer
+   `envsubst`, pacote `gettext-base`).
+5. `bash helm-releases/install.sh` - Gateway API CRDs, Cilium, cert-manager,
+   Trivy Operator, Grafana Alloy (métricas/logs/traces pro Grafana Cloud).
 6. Criar o Secret `cloudflare-api-token` (ver [Secrets](#secrets)), depois
    `bash manifests/apply.sh`.
 7. `cloudflared tunnel create` e criar o Secret `cloudflared-creds`.
@@ -68,6 +70,8 @@ Não versionados - criar manualmente:
   `terraform.tfvars`, ver [terraform/README.md](terraform/README.md)).
 - `aws-secret` (ns `kube-system`): credenciais do cluster-autoscaler, ver
   [terraform/README.md](terraform/README.md#cluster-autoscaler).
+- `GRAFANA_CLOUD_TOKEN` (via `.env`): Cloud Access Policy token gerado pelo
+  wizard "Connect Kubernetes" do Grafana Cloud.
 
 ## Licença
 
