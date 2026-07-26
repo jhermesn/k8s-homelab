@@ -5,4 +5,4 @@ operator:
     limits: {cpu: 200m, memory: 256Mi}
 
 trivyOperator:
-  scanJobsConcurrentLimit: 2
+  scanJobsConcurrentLimit: 1
