@@ -17,3 +17,14 @@ gatewayAPI:
   enabled: true
   hostNetwork:
     enabled: true
+envoy:
+  enabled: true
+  securityContext:
+    capabilities:
+      keepCapNetBindService: true
+      # NET_ADMIN + SYS_ADMIN são o default do chart (datapath do Cilium)
+      # NET_BIND_SERVICE é só o adicional pro Envoy bindar a porta 80/443.
+      envoy:
+        - NET_ADMIN
+        - SYS_ADMIN
+        - NET_BIND_SERVICE

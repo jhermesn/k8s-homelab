@@ -57,7 +57,7 @@ resource "aws_route_table_association" "public" {
 resource "aws_security_group" "spot_worker" {
   name_prefix = "k8s-spot-worker-"
   vpc_id      = aws_vpc.this.id
-  description = "Worker Spot sem regra de entrada, só conecta outbound (Tailscale)"
+  description = "Worker Spot sem regra de entrada, so conecta outbound (Tailscale)"
 
   egress {
     description = "DNS"

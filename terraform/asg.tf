@@ -25,13 +25,8 @@ resource "aws_launch_template" "spot_worker" {
     http_put_response_hop_limit = 1
   }
 
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      spot_instance_type = "one-time"
-    }
-  }
-
+  # Spot é configurado via instances_distribution no ASG (mixed_instances_policy),
+  # não aqui, instance_market_options conflita com mixed_instances_policy.
   user_data = base64encode(templatefile("${path.module}/userdata.sh.tpl", {
     tailscale_authkey_ssm_param = var.tailscale_authkey_ssm_param
     kubeadm_join_ssm_param      = var.kubeadm_join_ssm_param
