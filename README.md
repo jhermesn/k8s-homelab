@@ -1,76 +1,73 @@
 # k8s-homelab
 
-Cluster Kubernetes on-premises (control plane + worker no mesmo node) com nodes
-spot remotos, exposto com segurança via Cloudflare Tunnel + Zero Trust.
+Cluster Kubernetes on-premises (control plane + worker no mesmo node), com
+worker Spot sob demanda na AWS, exposto via Cloudflare Tunnel + Zero Trust.
 
 ## Arquitetura
 
 ```
-Internet → Cloudflare (Zero Trust Access) → Cloudflare Tunnel (outbound-only)
-         → ingress-nginx (ClusterIP) → Service → Pod
+Internet → Cloudflare Zero Trust → Cloudflare Tunnel (outbound-only)
+         → Cilium Gateway API (hostNetwork) → Pod
 
-Spot nodes (AWS) → Tailscale mesh → kube-apiserver (control plane)
+AWS Spot worker (0-2, sob demanda) → Tailscale mesh → kube-apiserver
 ```
 
-- **Control plane**: Lenovo IdeaPad (i3 6th gen, 12GB RAM), Ubuntu Server,
-  clamshell na parede, sempre na tomada. Roda control plane + workloads
-  (taint removido — sem HA multi-node, não faz sentido isolar).
-- **CNI**: Cilium, dual-stack IPv4/IPv6, kube-proxy replacement (eBPF).
-- **Ingress**: ingress-nginx.
-- **TLS**: cert-manager + Let's Encrypt via DNS-01 (Cloudflare).
-- **Exposição pública**: Cloudflare Tunnel — zero portas abertas no roteador.
-- **Zero Trust**: Access Applications por hostname (`*.jhermesn.dev` sob
-  proteção Admin por padrão; hosts específicos liberados via "Rotas Públicas").
-- **Mesh privado**: Tailscale — conecta Mac, control plane e futuros spot
-  nodes sem expor a rede local.
-- **IaC futura**: Terraform + ServiceAccount RBAC escopado (`kube-system/terraform`).
+| Componente | Escolha |
+|---|---|
+| Control plane | Roda control plane + workloads (sem HA multi-node) |
+| Ingress | Cilium Gateway API (`hostNetwork`) |
+| CNI | Cilium, dual-stack, kube-proxy replacement (eBPF) |
+| TLS | cert-manager + Let's Encrypt (DNS-01 via Cloudflare) |
+| Exposição pública | Cloudflare Tunnel |
+| Mesh privado | Tailscale |
+| Worker extra | Spot `t3.micro` na AWS, escalado pelo cluster-autoscaler |
 
 ## Estrutura do repo
 
 ```
-helm-releases/       # Charts instalados (Cilium, ingress-nginx, cert-manager)
-  install.sh          # Script único de reprodução, versões pinadas
-  <chart>/values.yaml # Values reais aplicados em cada release
-
-manifests/
-  cert-manager/       # ClusterIssuer (Let's Encrypt DNS-01 via Cloudflare)
-  cloudflare-tunnel/  # ConfigMap + Deployment do cloudflared, notas de padrão
-  rbac/               # ServiceAccount/RBAC escopado para Terraform
+.env.example        # copiar para .env (gitignored) no master node
+cd.sh                # CD: git pull + helm/manifests + terraform apply
+os-setup/setup.sh   # provisionamento OS-level (idempotente)
+helm-releases/       # Cilium, cert-manager (install.sh idempotente)
+manifests/           # ClusterIssuer, Gateway, cloudflared, cluster-autoscaler, RBAC (apply.sh)
+terraform/           # worker Spot AWS
 ```
 
-## Rebuild do zero (disaster recovery)
+## Setup do zero
 
-1. Ubuntu Server fresh install → configura rede (netplan/wifi), DHCP
-   reservation no roteador para o MAC da wlp2s0.
-2. Swap off, sysctl (`br_netfilter`, `ip_forward`), containerd
-   (`SystemdCgroup=true`), kubeadm/kubelet/kubectl instalados e pinados.
-3. `kubeadm init` com dual-stack (`podSubnet`/`serviceSubnet` com CIDR v4+v6)
-   e `KubeletConfiguration` com `systemReserved`/`kubeReserved`.
-4. `bash helm-releases/install.sh` — reinstala Cilium, ingress-nginx,
-   cert-manager nas versões pinadas.
-5. `kubectl apply -f manifests/cert-manager/clusterissuer.yaml`
-   (recriar o Secret `cloudflare-api-token` antes — não versionado, ver abaixo).
-6. Recriar o túnel Cloudflare (`cloudflared tunnel create`) e o Secret de
-   credenciais, depois `kubectl apply -f manifests/cloudflare-tunnel/`.
-7. `kubectl apply -f manifests/rbac/terraform-rbac.yaml`.
-8. Tailscale: `tailscale up`, adicionar IP como SAN extra no cert do
+1. Ubuntu Server fresh install, rede configurada, DHCP reservation no roteador.
+2. `bash os-setup/setup.sh` - SO hardening (SSH key-only, UFW restrito a
+   `tailscale0`, fail2ban), containerd, kubeadm/kubelet/kubectl, Tailscale,
+   Helm, cloudflared. Ver pendências manuais impressas ao final.
+3. `kubeadm init` (dual-stack).
+4. `cp .env.example .env` e preencher `TUNNEL_ID`, `ACME_EMAIL`,
+   `CONTROL_PLANE_LAN_IP`, `AWS_REGION` (requer `envsubst`, pacote `gettext-base`).
+5. `bash helm-releases/install.sh` - Gateway API CRDs, Cilium, cert-manager.
+6. Criar o Secret `cloudflare-api-token` (ver [Secrets](#secrets)), depois
+   `bash manifests/apply.sh`.
+7. `cloudflared tunnel create` e criar o Secret `cloudflared-creds`.
+8. `tailscale up` - adicionar o IP da tailnet como SAN extra no cert do
    apiserver (`kubeadm init phase certs apiserver --apiserver-cert-extra-sans=...`).
 
-## Secrets (não versionados — recriar manualmente)
+Depois disso, `bash cd.sh` mantém tudo sincronizado com o repo, então deve-se rodar
+manual ou via cron numa máquina com Tailscale + credenciais AWS.
 
-- `cloudflare-api-token` (namespace `cert-manager`): token Cloudflare
-  escopado em **Zone** (não Account) — `Zone:DNS:Edit` + `Zone:Zone:Read`,
-  restrito à zona `jhermesn.dev`.
-- `cloudflared-creds` (namespace `cloudflare-tunnel`): `credentials.json`
-  gerado por `cloudflared tunnel create`.
+Novas apps: criar `HTTPRoute` apontando pro Gateway `cilium-gateway`
+(namespace `gateway`) - sem Ingress, sem annotation de redirect.
 
-## Notas operacionais
+## Secrets
 
-- Todo Ingress atrás do Cloudflare Tunnel precisa de
-  `nginx.ingress.kubernetes.io/ssl-redirect: "false"` e
-  `force-ssl-redirect: "false"` — evita loop de redirect (TLS público já
-  termina na borda da Cloudflare, túnel fala HTTP puro com o ingress-nginx).
-- SSH restrito à interface `tailscale0` (UFW), chave-only, sem senha.
-- Governor de CPU em `performance` (laptop sempre na tomada).
-- Lid switch mascarado (`HandleLidSwitch=ignore`) — cluster roda com a
-  tampa fechada.
+Não versionados - criar manualmente:
+
+- `cloudflare-api-token` (ns `cert-manager`): token Cloudflare escopado em
+  **Zone** (`DNS:Edit` + `Zone:Read`), restrito ao domínio usado.
+- `cloudflared-creds` (ns `cloudflare-tunnel`): `credentials.json` do
+  `cloudflared tunnel create`.
+- Worker Spot AWS: authkey do Tailscale e kubeadm join command (via
+  `terraform.tfvars`, ver [terraform/README.md](terraform/README.md)).
+- `aws-secret` (ns `kube-system`): credenciais do cluster-autoscaler, ver
+  [terraform/README.md](terraform/README.md#cluster-autoscaler).
+
+## Licença
+
+Este projeto está licenciado sob a [Licença MIT](LICENSE).

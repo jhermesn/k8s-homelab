@@ -6,10 +6,14 @@ ipv4:
   enabled: true
 ipv6:
   enabled: true
-k8sServiceHost: 192.168.1.7
+k8sServiceHost: ${CONTROL_PLANE_LAN_IP}
 k8sServicePort: 6443
 kubeProxyReplacement: true
 operator:
   replicas: 1
 routingMode: tunnel
 tunnelProtocol: vxlan
+gatewayAPI:
+  enabled: true
+  hostNetwork:
+    enabled: true

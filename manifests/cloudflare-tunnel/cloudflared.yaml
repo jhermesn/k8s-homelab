@@ -5,12 +5,10 @@ metadata:
   namespace: cloudflare-tunnel
 data:
   config.yaml: |
-    tunnel: 8a9756d3-2bd5-4ef0-b71d-1f4113e3f63b
+    tunnel: ${TUNNEL_ID} # gerado por cloudflared tunnel create
     credentials-file: /etc/cloudflared/creds/credentials.json
     ingress:
-      - hostname: app.jhermesn.dev
-        service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
-      - service: http_status:404
+      - service: http://127.0.0.1:80
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -18,17 +16,44 @@ metadata:
   name: cloudflared
   namespace: cloudflare-tunnel
 spec:
-  replicas: 2
+  replicas: 1 # hostNetwork
   selector:
     matchLabels: {app: cloudflared}
   template:
     metadata:
       labels: {app: cloudflared}
     spec:
+      # checkov:skip=CKV_K8S_19: alcança o Cilium Gateway API via 127.0.0.1
+      # (Envoy também roda em hostNetwork, único jeito de expor um Gateway
+      # sem LoadBalancer bare-metal). cloudflared não abre porta nenhuma, só
+      # conecta outbound.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
       containers:
       - name: cloudflared
-        image: cloudflare/cloudflared:latest
-        args: ["tunnel", "--config", "/etc/cloudflared/config.yaml", "run"]
+        image: cloudflare/cloudflared:2026.7.3@sha256:e39ee8da81ad5e05d77f38d2f51c60ca51bf2a8450ac3abab50c17fdb91d91bf
+        args: ["tunnel", "--config", "/etc/cloudflared/config.yaml", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65532
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: ["ALL"]}
+        livenessProbe:
+          httpGet: {path: /ready, port: 2000}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 1
+        readinessProbe:
+          httpGet: {path: /ready, port: 2000}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests: {cpu: 50m, memory: 32Mi, ephemeral-storage: 32Mi}
+          limits: {cpu: 200m, memory: 128Mi, ephemeral-storage: 256Mi}
         volumeMounts:
         - {name: config, mountPath: /etc/cloudflared}
         - {name: creds, mountPath: /etc/cloudflared/creds}
@@ -37,3 +62,13 @@ spec:
         configMap: {name: cloudflared-config}
       - name: creds
         secret: {secretName: cloudflared-creds}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudflared-default-deny-ingress
+  namespace: cloudflare-tunnel
+spec:
+  podSelector: {matchLabels: {app: cloudflared}}
+  policyTypes: ["Ingress"]
+  ingress: [] # cloudflared não recebe tráfego de outros pods, só faz conexões outbound

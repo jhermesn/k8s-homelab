@@ -1,0 +1,8 @@
+aws_region = "us-east-1"
+
+tailscale_authkey_ssm_param = "/k8s-homelab/tailscale-authkey"
+kubeadm_join_ssm_param      = "/k8s-homelab/kubeadm-join-command"
+
+# Secrets
+tailscale_authkey     = "tskey-auth-xxxxxxxxxxxx"
+kubeadm_join_command  = "kubeadm join 100.x.x.x:6443 --token xxxxx.xxxxxxxxxxxxxxxx --discovery-token-ca-cert-hash sha256:xxxx"

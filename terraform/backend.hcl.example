@@ -1,0 +1,4 @@
+bucket       = "<bucket-do-state>"
+key          = "k8s-homelab/terraform.tfstate"
+region       = "<region>"
+use_lockfile = true

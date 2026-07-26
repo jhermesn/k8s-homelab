@@ -1,0 +1,15 @@
+*.pem
+*.key
+*.crt
+credentials.json
+kubeconfig
+kubeconfig.yaml
+.env
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars
+!*.tfvars.example
+terraform/backend.hcl
