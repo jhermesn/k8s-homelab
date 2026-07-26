@@ -28,9 +28,10 @@ AWS Spot worker (0-2, sob demanda) → Tailscale mesh → kube-apiserver
 .env.example        # copiar para .env (gitignored) no master node
 cd.sh                # CD: git pull + helm/manifests + terraform apply
 os-setup/setup.sh   # provisionamento OS-level (idempotente)
-helm-releases/       # Cilium, cert-manager (install.sh idempotente)
-manifests/           # ClusterIssuer, Gateway, cloudflared, cluster-autoscaler, RBAC (apply.sh)
+helm-releases/       # Cilium, cert-manager, Trivy Operator (install.sh idempotente)
+manifests/           # ClusterIssuer, Gateway, cloudflared, cluster-autoscaler (apply.sh)
 terraform/           # worker Spot AWS
+examples/app-template/  # referência pra deployar apps novas (não aplicado por apply.sh)
 ```
 
 ## Setup do zero

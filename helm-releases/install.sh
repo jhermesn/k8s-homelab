@@ -19,3 +19,8 @@ helm repo add jetstack https://charts.jetstack.io
 helm upgrade --install cert-manager jetstack/cert-manager \
   -n cert-manager --create-namespace \
   --version v1.21.0 -f cert-manager/values.yaml
+
+helm repo add aqua https://aquasecurity.github.io/helm-charts/
+helm upgrade --install trivy-operator aqua/trivy-operator \
+  -n trivy-system --create-namespace \
+  --version 0.34.0 -f trivy-operator/values.yaml
