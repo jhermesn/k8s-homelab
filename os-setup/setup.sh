@@ -123,6 +123,24 @@ EOF
   sudo sysctl --system
 }
 
+setup_boot_params() {
+  log "Boot: SATA LPM desligado e kdump desativado"
+  # SATA LPM com DIPM (lpm-pol 3) gera BadCRC/CommWake no link do SSD.
+  echo 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT ahci.mobile_lpm_policy=1"' | \
+    sudo tee /etc/default/grub.d/99-homelab.cfg > /dev/null
+
+  # Com root em LUKS o crash kernel não desbloqueia o disco sem senha interativa:
+  # o nó ficava preso no initramfs em vez de reiniciar (kernel.panic=10 do kubelet).
+  if systemctl cat kdump-tools.service >/dev/null 2>&1; then
+    sudo systemctl disable --now kdump-tools
+  fi
+  for f in /etc/default/grub.d/*.cfg; do
+    [ -f "$f" ] || continue
+    sudo sed -i 's/^\([^#].*crashkernel=.*\)$/#\1/' "$f"
+  done
+  sudo update-grub
+}
+
 install_containerd() {
   log "containerd (cgroup driver systemd)"
   sudo apt install -y containerd
@@ -190,6 +208,7 @@ main() {
   mask_sleep_targets
   set_cpu_performance
   setup_kernel_modules_sysctl
+  setup_boot_params
   install_containerd
   install_kubeadm_stack
   install_tailscale

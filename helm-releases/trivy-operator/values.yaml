@@ -1,8 +1,18 @@
 operator:
   replicas: 1
-  resources:
-    requests: {cpu: 100m, memory: 128Mi}
-    limits: {cpu: 200m, memory: 256Mi}
-
-trivyOperator:
+  # No chart 0.34.0 a chave fica em operator.* (em trivyOperator.* era ignorada
+  # e valia o default de 10 scan jobs simultâneos).
   scanJobsConcurrentLimit: 1
+
+# Recursos do pod do operator ficam no top-level no chart 0.34.0
+# (operator.resources era ignorado).
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: 200m, memory: 256Mi}
+
+# Recursos dos scan jobs. Com o default (limit 500M) o trivy era morto por
+# OOM do cgroup e o job reiniciava em loop.
+trivy:
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {cpu: 500m, memory: 1Gi}

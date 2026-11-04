@@ -67,7 +67,10 @@ applicationObservability:
       port: 9411
 
 autoInstrumentation:
-  enabled: true
+  # Desativado: o programa eBPF do Beyla/OBI (obi_protocol_tcp) causa kernel oops
+  # no caminho de uprobe do kernel 7.0.0-38-generic; com panic_on_oops=1 (kubelet)
+  # o nó entra em panic. Reavaliar só com fix no kernel ou no Beyla/OBI.
+  enabled: false
   collector: alloy-metrics
   beyla:
     deliverTracesToApplicationObservability: false
