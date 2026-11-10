@@ -67,16 +67,16 @@ spec:
     - name: my-app
       port: 80
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
   name: my-app-default-deny-ingress
   namespace: my-app
 spec:
-  podSelector: {matchLabels: {app: my-app}}
-  policyTypes: ["Ingress"]
+  endpointSelector: {matchLabels: {app: my-app}}
   ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: gateway
+  # O Envoy do Cilium Gateway chega com a identity reservada "ingress"; um
+  # NetworkPolicy com namespaceSelector no ns `gateway` não casa e derruba o tráfego.
+  - fromEntities: ["ingress"]
+    toPorts:
+    - ports: [{port: "8080", protocol: TCP}]
