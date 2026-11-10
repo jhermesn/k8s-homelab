@@ -120,6 +120,14 @@ net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward                 = 1
 net.ipv6.conf.all.forwarding        = 1
 EOF
+
+  # Tailscale seta net.ipv4.conf.all.src_valid_mark=1, o que derruba as respostas
+  # dos pods pro Envoy do Cilium Gateway no mesmo nó (503 "connection timeout",
+  # cilium/cilium#48706, #47940). accept_local=1 nas veths lxc* contorna; o
+  # default é herdado pelas veths criadas depois.
+  cat <<EOF | sudo tee /etc/sysctl.d/99-cilium-gateway.conf
+net.ipv4.conf.default.accept_local = 1
+EOF
   sudo sysctl --system
 }
 

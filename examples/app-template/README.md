@@ -10,9 +10,11 @@ cp -r examples/app-template apps/minha-app   # fora do apply.sh de propósito
 Editar em `app.yaml`:
 - `image`: pinar por digest (`image@sha256:...`), nunca `:latest`.
 - `hostnames` do `HTTPRoute`: subdomínio real.
-- `containerPort`/`targetPort`/probes: porta real da app.
-- `NetworkPolicy`: só permite ingress do namespace `gateway` (onde o Cilium
-  Gateway/Envoy roda), ajustar se a app precisar receber de outro lugar.
+- `containerPort`/`targetPort`/probes: porta real da app (e a porta no
+  `toPorts` do `CiliumNetworkPolicy`).
+- `CiliumNetworkPolicy`: só permite ingress vindo do Gateway (entity `ingress`,
+  o Envoy do Cilium), ajustar se a app precisar receber de outro lugar.
+  `NetworkPolicy` com `namespaceSelector` não funciona aqui.
 
 Depois de aplicar (`kubectl apply -f apps/minha-app/app.yaml`):
 

@@ -55,6 +55,13 @@ examples/app-template/  # referência pra deployar apps novas (não aplicado por
 Depois disso, `bash cd.sh` mantém tudo sincronizado com o repo, então deve-se rodar
 manual ou via cron numa máquina com Tailscale + credenciais AWS.
 
+Se o Gateway responder `503 ... connection timeout` pra pods no mesmo nó, é o
+`net.ipv4.conf.all.src_valid_mark=1` do Tailscale interagindo com o Envoy do
+Cilium ([cilium/cilium#48706](https://github.com/cilium/cilium/issues/48706)).
+O `setup.sh` já aplica o workaround (`net.ipv4.conf.default.accept_local=1`
+em `/etc/sysctl.d/99-cilium-gateway.conf`); em nós já provisionados, criar
+esse arquivo e setar `accept_local=1` nas veths `lxc*` existentes.
+
 Novas apps: criar `HTTPRoute` apontando pro Gateway `cilium-gateway`
 (namespace `gateway`) - sem Ingress, sem annotation de redirect.
 
